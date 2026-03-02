@@ -198,10 +198,12 @@ function mapCliOptionsToSDK(options = {}) {
     sdkOptions.settingSources = [];
     sdkOptions.allowedTools = [];
     sdkOptions.disallowedTools = [];
-    // Force subprocess to skip its own permission checks entirely,
-    // relying on our canUseTool callback as the sole permission gate
-    sdkOptions.allowDangerouslySkipPermissions = true;
-    console.log('[claude-sdk] Webhook mode: cleared settings, enabled dangerouslySkipPermissions');
+    // The SDK already passes settingSources: [] to the subprocess,
+    // so no local permissions (.claude/settings.local.json) are loaded.
+    // With canUseTool set (line below), the SDK passes --permission-prompt-tool stdio,
+    // making ALL tool uses route through our canUseTool callback.
+    // Do NOT set allowDangerouslySkipPermissions — it would skip the stdio prompt.
+    console.log('[claude-sdk] Webhook mode: canUseTool will route through external handler');
   } else {
     sdkOptions.settingSources = ['project', 'user', 'local'];
   }
