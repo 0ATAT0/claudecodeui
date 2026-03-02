@@ -57,30 +57,10 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
         case 'claude-response': {
           const d = msg.data;
           if (!d) break;
-
-          if (d.type === 'assistant' || d.type === 'text') {
-            emitEvent('session.message', {
-              sessionId: this._sessionId,
-              type: 'assistant',
-              text: d.text ?? (d.message?.content?.[0]?.text) ?? '',
-            });
-          }
-
-          if (d.type === 'tool_use') {
-            emitEvent('session.tool_use', {
-              sessionId: this._sessionId,
-              tool: d.name,
-              input: d.input,
-            });
-          }
-
-          if (d.type === 'tool_result') {
-            emitEvent('session.tool_result', {
-              sessionId: this._sessionId,
-              tool: d.tool_use_id,
-              status: d.is_error ? 'error' : 'success',
-            });
-          }
+          // NOTE: session.message, session.tool_use, session.tool_result deliberately
+          // NOT emitted to SSE. Streaming every tool call and assistant message would
+          // flood the consumer's context window and nearly double token usage.
+          // Use GET /sessions/:id/messages for on-demand history instead.
 
           if (d.type === 'result') {
             // context monitor
@@ -210,7 +190,7 @@ async function startSession(opts) {
     status: 'running', permissionMode, startedAt,
   });
 
-  emitEvent('session.started', { sessionId: id, provider, projectPath, label });
+  // session.started not emitted to SSE — caller gets the response directly
 
   // Build shared options
   const permFlags = resolvePermissionFlags(permissionMode);

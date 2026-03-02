@@ -2,7 +2,9 @@
  * Context Monitor
  *
  * Tracks token usage per session and emits threshold events.
- * Thresholds: 60% (info), 80% (warning), 93% (critical), 97% (emergency)
+ * Only critical (93%) and emergency (97%) thresholds emit SSE events.
+ * Lower thresholds (60%, 80%) are tracked in DB but not pushed to avoid
+ * flooding the consumer's context window.
  * Each threshold fires at most once per session (de-duplicated).
  */
 
@@ -10,8 +12,6 @@ import { emitEvent } from './eventStream.js';
 import { updateOrchestrationSession } from './db.js';
 
 const THRESHOLDS = [
-  { percent: 60, level: 'info' },
-  { percent: 80, level: 'warning' },
   { percent: 93, level: 'critical' },
   { percent: 97, level: 'emergency' },
 ];
