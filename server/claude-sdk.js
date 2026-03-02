@@ -170,14 +170,22 @@ function mapCliOptionsToSDK(options = {}) {
     }
   }
 
-  sdkOptions.allowedTools = allowedTools;
+  // Only pass allow/disallow lists when explicitly configured.
+  // Passing an empty allowedTools array can hide all tools from the model,
+  // which prevents permission interception from ever firing.
+  if (allowedTools.length > 0) {
+    sdkOptions.allowedTools = allowedTools;
+  }
 
   // Use the tools preset to make all default built-in tools available (including AskUserQuestion).
   // This was introduced in SDK 0.1.57. Omitting this preserves existing behavior (all tools available),
   // but being explicit ensures forward compatibility and clarity.
   sdkOptions.tools = { type: 'preset', preset: 'claude_code' };
 
-  sdkOptions.disallowedTools = settings.disallowedTools || [];
+  const disallowed = settings.disallowedTools || [];
+  if (disallowed.length > 0) {
+    sdkOptions.disallowedTools = disallowed;
+  }
 
   // Map model (default to sonnet)
   // Valid models: sonnet, opus, haiku, opusplan, sonnet[1m]
@@ -196,8 +204,6 @@ function mapCliOptionsToSDK(options = {}) {
     // short-circuiting our external permission handler. CLAUDE.md prompts
     // are still loaded by the subprocess from the project directory.
     sdkOptions.settingSources = [];
-    sdkOptions.allowedTools = [];
-    sdkOptions.disallowedTools = [];
     // The SDK already passes settingSources: [] to the subprocess,
     // so no local permissions (.claude/settings.local.json) are loaded.
     // With canUseTool set (line below), the SDK passes --permission-prompt-tool stdio,
