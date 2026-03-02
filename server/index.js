@@ -64,6 +64,8 @@ import cliAuthRoutes from './routes/cli-auth.js';
 import userRoutes from './routes/user.js';
 import codexRoutes from './routes/codex.js';
 import geminiRoutes from './routes/gemini.js';
+import orchestrationRouter from './orchestration/router.js';
+import { initOrchestrationDb } from './orchestration/db.js';
 import { initializeDatabase } from './database/db.js';
 import { validateApiKey, authenticateToken, authenticateWebSocket } from './middleware/auth.js';
 import { IS_PLATFORM } from './constants/config.js';
@@ -386,6 +388,10 @@ app.use('/api/codex', authenticateToken, codexRoutes);
 
 // Gemini API Routes (protected)
 app.use('/api/gemini', authenticateToken, geminiRoutes);
+
+
+// Orchestration API Routes (dual auth: API key or JWT)
+app.use('/api/orchestration', orchestrationRouter);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -1979,6 +1985,8 @@ async function startServer() {
     try {
         // Initialize authentication database
         await initializeDatabase();
+        // Initialize orchestration tables
+        initOrchestrationDb();
 
         // Check if running in production mode (dist folder exists)
         const distIndexPath = path.join(__dirname, '../dist/index.html');
