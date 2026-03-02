@@ -312,6 +312,7 @@ async function runProvider(provider, message, options, wsAdapter, sessionId, per
  * and rerouting them through the broker.
  */
 async function queryClaudeSDKWithWebhook(message, options, wsAdapter, sessionId) {
+  console.log('[WebhookHook] Starting webhook-mode session', sessionId);
   const webhookFn = options._orchWebhookCanUseTool;
 
   // Create a patched ws that intercepts claude-permission-request messages
@@ -324,6 +325,7 @@ async function queryClaudeSDKWithWebhook(message, options, wsAdapter, sessionId)
       }
 
       if (msg?.type === 'claude-permission-request') {
+        console.log('[WebhookHook] Intercepted permission request:', msg.toolName, msg.requestId);
         // Route through webhook broker instead of WS relay
         const { requestId, toolName, input } = msg;
         webhookFn(toolName, input).then(sdkDecision => {
