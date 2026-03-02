@@ -191,8 +191,17 @@ function mapCliOptionsToSDK(options = {}) {
   };
 
   // Map setting sources for CLAUDE.md loading
-  // This loads CLAUDE.md from project, user (~/.config/claude/CLAUDE.md), and local directories
-  sdkOptions.settingSources = ['project', 'user', 'local'];
+  if (options._externalCanUseTool) {
+    // Webhook mode: skip ALL settings to prevent permissions.allow from
+    // short-circuiting our external permission handler. CLAUDE.md prompts
+    // are still loaded by the subprocess from the project directory.
+    sdkOptions.settingSources = [];
+    sdkOptions.allowedTools = [];
+    sdkOptions.disallowedTools = [];
+    console.log('[claude-sdk] Webhook mode: cleared settingSources and allowedTools');
+  } else {
+    sdkOptions.settingSources = ['project', 'user', 'local'];
+  }
 
   // Map resume session
   if (sessionId) {
