@@ -498,12 +498,10 @@ async function queryClaudeSDK(command, options = {}, ws) {
     tempDir = imageResult.tempDir;
 
     sdkOptions.canUseTool = async (toolName, input, context) => {
-      console.log('[canUseTool] Called for tool:', toolName, 'hasExternal:', !!options._externalCanUseTool);
       // Orchestration webhook override — route through external handler
       // This must fire BEFORE the bypassPermissions check so webhook mode
       // always routes through Arbiter regardless of permission settings
       if (options._externalCanUseTool) {
-        console.log('[canUseTool] Routing through external webhook handler for:', toolName);
         return options._externalCanUseTool(toolName, input, context);
       }
 
