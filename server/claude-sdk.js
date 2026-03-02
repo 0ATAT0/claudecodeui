@@ -198,7 +198,10 @@ function mapCliOptionsToSDK(options = {}) {
     sdkOptions.settingSources = [];
     sdkOptions.allowedTools = [];
     sdkOptions.disallowedTools = [];
-    console.log('[claude-sdk] Webhook mode: cleared settingSources and allowedTools');
+    // Force subprocess to skip its own permission checks entirely,
+    // relying on our canUseTool callback as the sole permission gate
+    sdkOptions.allowDangerouslySkipPermissions = true;
+    console.log('[claude-sdk] Webhook mode: cleared settings, enabled dangerouslySkipPermissions');
   } else {
     sdkOptions.settingSources = ['project', 'user', 'local'];
   }
@@ -489,6 +492,8 @@ async function queryClaudeSDK(command, options = {}, ws) {
     sdkOptions.canUseTool = async (toolName, input, context) => {
       console.log('[canUseTool] Called for tool:', toolName, 'hasExternal:', !!options._externalCanUseTool);
       // Orchestration webhook override — route through external handler
+      // This must fire BEFORE the bypassPermissions check so webhook mode
+      // always routes through Arbiter regardless of permission settings
       if (options._externalCanUseTool) {
         console.log('[canUseTool] Routing through external webhook handler for:', toolName);
         return options._externalCanUseTool(toolName, input, context);
