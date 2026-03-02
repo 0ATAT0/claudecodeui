@@ -220,7 +220,11 @@ async function startSession(opts) {
 
   // Webhook: override canUseTool
   if (permissionMode === 'webhook' && provider === 'claude') {
-    baseOptions._webhookCanUseTool = buildWebhookCanUseTool(id, projectPath, provider, SERVER_BASE_URL);
+    const webhookFn = buildWebhookCanUseTool(id, projectPath, provider, SERVER_BASE_URL);
+    baseOptions._externalCanUseTool = async (toolName, input, context) => {
+      const result = await webhookFn(toolName, input);
+      return result; // { behavior: 'allow'|'deny', message?: string }
+    };
   }
 
   // Fire and forget (don't await — the session runs async)
@@ -251,14 +255,9 @@ async function runProvider(provider, message, options, wsAdapter, sessionId, per
   try {
     switch (provider) {
       case 'claude':
-        if (options._orchWebhookCanUseTool) {
-          // We need to inject canUseTool. Patch the ws adapter to intercept
-          // the canUseTool hook. Since queryClaudeSDK sets canUseTool on sdkOptions
-          // internally, we must wrap it.
-          await queryClaudeSDKWithWebhook(message, options, wsAdapter, sessionId);
-        } else {
-          await queryClaudeSDK(message, options, wsAdapter);
-        }
+        // _externalCanUseTool is set on options for webhook mode,
+        // claude-sdk.js reads it directly in its canUseTool callback
+        await queryClaudeSDK(message, options, wsAdapter);
         break;
       case 'codex':
         await queryCodex(message, options, wsAdapter);

@@ -478,6 +478,11 @@ async function queryClaudeSDK(command, options = {}, ws) {
     tempDir = imageResult.tempDir;
 
     sdkOptions.canUseTool = async (toolName, input, context) => {
+      // Orchestration webhook override — route through external handler
+      if (options._externalCanUseTool) {
+        return options._externalCanUseTool(toolName, input, context);
+      }
+
       const requiresInteraction = TOOLS_REQUIRING_INTERACTION.has(toolName);
 
       if (!requiresInteraction) {
