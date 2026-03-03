@@ -62,6 +62,7 @@ router.post('/sessions', async (req, res) => {
       model: detail.model,
       status: detail.status,
       label: detail.label,
+      origin: detail.origin,
       startedAt: detail.startedAt,
       eventsUrl: detail.eventsUrl,
     });

@@ -66,6 +66,7 @@ import codexRoutes from './routes/codex.js';
 import geminiRoutes from './routes/gemini.js';
 import orchestrationRouter from './orchestration/router.js';
 import { initOrchestrationDb } from './orchestration/db.js';
+import { startOcNotifyBridge } from './orchestration/ocNotify.js';
 import { initializeDatabase } from './database/db.js';
 import { validateApiKey, authenticateToken, authenticateWebSocket } from './middleware/auth.js';
 import { IS_PLATFORM } from './constants/config.js';
@@ -1987,6 +1988,8 @@ async function startServer() {
         await initializeDatabase();
         // Initialize orchestration tables
         initOrchestrationDb();
+        // Start OC notification bridge (pushes lifecycle events to Linus)
+        startOcNotifyBridge();
 
         // Check if running in production mode (dist folder exists)
         const distIndexPath = path.join(__dirname, '../dist/index.html');
