@@ -272,14 +272,18 @@ async function runProvider(provider, message, options, wsAdapter, sessionId, per
         throw new Error(`Unknown provider: ${provider}`);
     }
   } finally {
-    // Mark ended if still running (normal exit)
+    // Fallback: if provider returned without emitting *-complete, don't hard-end.
+    // Mark idle and trigger queued instruction delivery.
+    // Why: hard-ending here races with instruction queue handoff and can expire
+    // queued instructions before they are delivered.
     const sess = getOrchestrationSession(sessionId);
-    if (sess && (sess.status === 'running')) {
-      const endedAt = new Date().toISOString();
-      updateOrchestrationSession(sessionId, { status: 'ended', ended_at: endedAt });
-      emitEvent('session.ended', { sessionId, reason: 'completed' });
-      onSessionEnded(sessionId);
-      clearSessionThresholds(sessionId);
+    if (sess && sess.status === 'running') {
+      const now = new Date().toISOString();
+      updateOrchestrationSession(sessionId, { status: 'idle', last_activity_at: now });
+      emitEvent('session.idle', { sessionId, reason: 'provider_return_fallback' });
+      onSessionIdle(sessionId).catch(err =>
+        console.error('[SessionController] onSessionIdle fallback error:', err.message)
+      );
     }
   }
 }
