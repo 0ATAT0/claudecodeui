@@ -23,6 +23,7 @@ const SCHEMA_SQL = `
     origin_channel     TEXT,
     origin_account_id  TEXT,
     origin_chat_id     TEXT,
+    cc_session_id      TEXT,
     started_at         TEXT NOT NULL,
     last_activity_at   TEXT NOT NULL,
     ended_at           TEXT,
@@ -68,6 +69,7 @@ function initOrchestrationDb() {
     if (!names.has('origin_channel')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_channel TEXT');
     if (!names.has('origin_account_id')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_account_id TEXT');
     if (!names.has('origin_chat_id')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_chat_id TEXT');
+    if (!names.has('cc_session_id')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN cc_session_id TEXT');
 
     console.log('[Orchestration] DB schema initialised');
   } catch (err) {
@@ -130,7 +132,7 @@ function listOrchestrationSessions({ status, provider, projectPath, limit = 20 }
 }
 
 function updateOrchestrationSession(id, fields) {
-  const allowed = ['status', 'last_activity_at', 'ended_at', 'context_used', 'context_total', 'label'];
+  const allowed = ['status', 'last_activity_at', 'ended_at', 'context_used', 'context_total', 'label', 'cc_session_id'];
   const setClauses = [];
   const params = [];
 

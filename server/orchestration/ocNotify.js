@@ -124,7 +124,9 @@ function startOcNotifyBridge() {
     }
 
     const message = formatNotification(event, data);
-    sendToOcSession(targetKey, message).catch(err => {
+    sendToOcSession(targetKey, message).then(() => {
+      console.log(`[ocNotify] ${event} for ${data.sessionId.slice(0, 8)} → sent to OC`);
+    }).catch(err => {
       console.warn(`[ocNotify] failed to notify for ${event}: ${err.message}`);
     });
   });

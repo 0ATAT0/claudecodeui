@@ -53,6 +53,17 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
         try { msg = JSON.parse(msg); } catch { return; }
       }
 
+      // Capture CC subprocess session ID from any message that carries it.
+      // session-created only fires for new sessions; on resume the SDK skips it.
+      // claude-response always includes sessionId once captured by the SDK.
+      if (msg?.sessionId && msg.sessionId !== this._sessionId) {
+        const sess = getOrchestrationSession(this._sessionId);
+        if (sess && !sess.cc_session_id) {
+          console.log(`[SessionController] Captured CC session ID ${msg.sessionId} for orchestration session ${this._sessionId} (from ${msg.type})`);
+          updateOrchestrationSession(this._sessionId, { cc_session_id: msg.sessionId });
+        }
+      }
+
       switch (msg?.type) {
         case 'claude-response': {
           const d = msg.data;
@@ -120,7 +131,8 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
         }
 
         case 'session-created': {
-          // Provider assigned a new session ID — update our tracking
+          // CC session ID capture handled by the generic check above.
+          // Update last_activity_at on session creation.
           if (msg.sessionId && msg.sessionId !== this._sessionId) {
             updateOrchestrationSession(this._sessionId, { last_activity_at: new Date().toISOString() });
           }
@@ -222,7 +234,14 @@ async function startSession(opts) {
   // Register delivery callback for instruction queue
   registerDeliveryCallback(id, async (msg) => {
     const deliverAdapter = buildWsAdapter(id);
-    const opts2 = { ...baseOptions, sessionId: resumeId || id };
+    // Read the real CC subprocess session ID from DB (captured during first query).
+    // This is the ID CC uses internally — NOT our orchestration UUID.
+    // Without this, resume fails with exit code 1 because the SDK can't find
+    // a session matching the orchestration UUID in CC's session store.
+    const freshSession = getOrchestrationSession(id);
+    const resumeSessionId = freshSession?.cc_session_id || resumeId || id;
+    console.log(`[SessionController] Delivering instruction to ${id}, resuming CC session ${resumeSessionId}`);
+    const opts2 = { ...baseOptions, sessionId: resumeSessionId };
     await runProvider(provider, msg, opts2, deliverAdapter, id, permissionMode, projectPath);
   });
 
