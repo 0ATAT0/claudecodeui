@@ -625,11 +625,16 @@ async function queryClaudeSDK(command, options = {}, ws) {
             type: 'session-created',
             sessionId: capturedSessionId
           });
-        } else {
-          console.log('Not sending session-created. sessionId:', sessionId, 'sessionCreatedSent:', sessionCreatedSent);
         }
       } else {
-        console.log('No session_id in message or already captured. message.session_id:', message.session_id, 'capturedSessionId:', capturedSessionId);
+        // On resume, capturedSessionId is the orchestration ID (not the real CC session ID).
+        // Forward the real CC session ID so the orchestration layer can capture it for future resumes.
+        if (message.session_id && message.session_id !== capturedSessionId) {
+          ws.send({
+            type: 'cc-session-id',
+            sessionId: message.session_id
+          });
+        }
       }
 
       // Transform and send message to WebSocket

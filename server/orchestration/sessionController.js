@@ -46,23 +46,15 @@ function newSessionId() {
  */
 function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
   const adapter = {
-    _sessionId: sessionId,
+    _orchId: sessionId,    // immutable orchestration ID — never changes
+    _sessionId: sessionId, // dynamic — updated by setSessionId() when CC assigns its own ID
     setSessionId(id) { this._sessionId = id; },
     send(msg) {
       if (typeof msg === 'string') {
         try { msg = JSON.parse(msg); } catch { return; }
       }
 
-      // Capture CC subprocess session ID from any message that carries it.
-      // session-created only fires for new sessions; on resume the SDK skips it.
-      // claude-response always includes sessionId once captured by the SDK.
-      if (msg?.sessionId && msg.sessionId !== this._sessionId) {
-        const sess = getOrchestrationSession(this._sessionId);
-        if (sess && !sess.cc_session_id) {
-          console.log(`[SessionController] Captured CC session ID ${msg.sessionId} for orchestration session ${this._sessionId} (from ${msg.type})`);
-          updateOrchestrationSession(this._sessionId, { cc_session_id: msg.sessionId });
-        }
-      }
+
 
       switch (msg?.type) {
         case 'claude-response': {
@@ -85,7 +77,7 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
                   (mu.cumulativeCacheReadInputTokens || mu.cacheReadInputTokens || 0) +
                   (mu.cumulativeCacheCreationInputTokens || mu.cacheCreationInputTokens || 0);
                 const total = parseInt(process.env.CONTEXT_WINDOW) || 160000;
-                updateContextUsage(this._sessionId, used, total);
+                updateContextUsage(this._orchId, used, total);
               }
             }
           }
@@ -95,7 +87,7 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
         case 'token-budget': {
           const { used, total } = msg.data || {};
           if (used != null && total != null) {
-            updateContextUsage(this._sessionId, used, total);
+            updateContextUsage(this._orchId, used, total);
           }
           break;
         }
@@ -105,12 +97,23 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
         case 'gemini-complete':
         case 'cursor-complete': {
           const now = new Date().toISOString();
-          updateOrchestrationSession(this._sessionId, { status: 'idle', last_activity_at: now });
-          emitEvent('session.idle', { sessionId: this._sessionId, reason: 'task_complete' });
-          onSessionIdle(this._sessionId).catch(err =>
+          updateOrchestrationSession(this._orchId, { status: 'idle', last_activity_at: now });
+          emitEvent('session.idle', { sessionId: this._orchId, reason: 'task_complete' });
+          onSessionIdle(this._orchId).catch(err =>
             console.error('[SessionController] onSessionIdle error:', err.message)
           );
           onComplete?.();
+          break;
+        }
+
+        case 'cc-session-id': {
+          // Persist the real CC subprocess session ID for future resume calls.
+          // cc-session-id fires on resume when SDK provides a different session_id.
+          const realCcId = msg.sessionId;
+          if (realCcId && realCcId !== this._orchId) {
+            console.log(`[SessionController] Captured CC session ID ${realCcId} for orchestration session ${this._orchId} (from ${msg.type})`);
+            updateOrchestrationSession(this._orchId, { cc_session_id: realCcId });
+          }
           break;
         }
 
@@ -119,22 +122,23 @@ function buildWsAdapter(sessionId, { onComplete, onError } = {}) {
         case 'gemini-error':
         case 'cursor-error': {
           const now = new Date().toISOString();
-          updateOrchestrationSession(this._sessionId, { status: 'error', last_activity_at: now });
+          updateOrchestrationSession(this._orchId, { status: 'error', last_activity_at: now });
           emitEvent('session.error', {
             sessionId: this._sessionId,
             error: msg.error || 'Provider error',
             recoverable: false,
           });
-          onSessionEnded(this._sessionId);
+          onSessionEnded(this._orchId);
           onError?.(msg.error);
           break;
         }
 
         case 'session-created': {
-          // CC session ID capture handled by the generic check above.
-          // Update last_activity_at on session creation.
-          if (msg.sessionId && msg.sessionId !== this._sessionId) {
-            updateOrchestrationSession(this._sessionId, { last_activity_at: new Date().toISOString() });
+          // Persist the real CC session ID on creation.
+          const ccId = msg.sessionId;
+          if (ccId && ccId !== this._orchId) {
+            console.log(`[SessionController] Captured CC session ID ${ccId} for orchestration session ${this._orchId} (from session-created)`);
+            updateOrchestrationSession(this._orchId, { cc_session_id: ccId, last_activity_at: new Date().toISOString() });
           }
           break;
         }
