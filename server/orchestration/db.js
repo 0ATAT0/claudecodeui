@@ -12,18 +12,22 @@ import { db } from '../database/db.js';
 
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS orchestration_sessions (
-    id               TEXT PRIMARY KEY,
-    provider         TEXT NOT NULL DEFAULT 'claude',
-    project_path     TEXT NOT NULL,
-    model            TEXT,
-    label            TEXT,
-    status           TEXT NOT NULL DEFAULT 'running',
-    permission_mode  TEXT NOT NULL DEFAULT 'webhook',
-    started_at       TEXT NOT NULL,
-    last_activity_at TEXT NOT NULL,
-    ended_at         TEXT,
-    context_used     INTEGER DEFAULT 0,
-    context_total    INTEGER DEFAULT 0
+    id                 TEXT PRIMARY KEY,
+    provider           TEXT NOT NULL DEFAULT 'claude',
+    project_path       TEXT NOT NULL,
+    model              TEXT,
+    label              TEXT,
+    status             TEXT NOT NULL DEFAULT 'running',
+    permission_mode    TEXT NOT NULL DEFAULT 'webhook',
+    origin_session_key TEXT,
+    origin_channel     TEXT,
+    origin_account_id  TEXT,
+    origin_chat_id     TEXT,
+    started_at         TEXT NOT NULL,
+    last_activity_at   TEXT NOT NULL,
+    ended_at           TEXT,
+    context_used       INTEGER DEFAULT 0,
+    context_total      INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS instruction_queue (
@@ -56,6 +60,15 @@ const SCHEMA_SQL = `
 function initOrchestrationDb() {
   try {
     db.exec(SCHEMA_SQL);
+
+    // Incremental migration for older DBs
+    const cols = db.prepare('PRAGMA table_info(orchestration_sessions)').all();
+    const names = new Set(cols.map((c) => c.name));
+    if (!names.has('origin_session_key')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_session_key TEXT');
+    if (!names.has('origin_channel')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_channel TEXT');
+    if (!names.has('origin_account_id')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_account_id TEXT');
+    if (!names.has('origin_chat_id')) db.exec('ALTER TABLE orchestration_sessions ADD COLUMN origin_chat_id TEXT');
+
     console.log('[Orchestration] DB schema initialised');
   } catch (err) {
     console.error('[Orchestration] Failed to init DB schema:', err.message);
@@ -68,9 +81,9 @@ function initOrchestrationDb() {
 function createOrchestrationSession(session) {
   const stmt = db.prepare(`
     INSERT INTO orchestration_sessions
-      (id, provider, project_path, model, label, status, permission_mode, started_at, last_activity_at)
+      (id, provider, project_path, model, label, status, permission_mode, origin_session_key, origin_channel, origin_account_id, origin_chat_id, started_at, last_activity_at)
     VALUES
-      (@id, @provider, @project_path, @model, @label, @status, @permission_mode, @started_at, @last_activity_at)
+      (@id, @provider, @project_path, @model, @label, @status, @permission_mode, @origin_session_key, @origin_channel, @origin_account_id, @origin_chat_id, @started_at, @last_activity_at)
   `);
   stmt.run({
     id: session.id,
@@ -80,6 +93,10 @@ function createOrchestrationSession(session) {
     label: session.label ?? null,
     status: session.status ?? 'running',
     permission_mode: session.permissionMode ?? 'webhook',
+    origin_session_key: session.originSessionKey ?? null,
+    origin_channel: session.originChannel ?? null,
+    origin_account_id: session.originAccountId ?? null,
+    origin_chat_id: session.originChatId ?? null,
     started_at: session.startedAt ?? new Date().toISOString(),
     last_activity_at: session.startedAt ?? new Date().toISOString(),
   });

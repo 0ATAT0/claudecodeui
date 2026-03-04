@@ -171,6 +171,10 @@ async function startSession(opts) {
     sessionId: resumeId,
     permissionMode = 'webhook',
     label,
+    originSessionKey,
+    originChannel,
+    originAccountId,
+    originChatId,
   } = opts;
 
   if (!projectPath) throw Object.assign(new Error('projectPath is required'), { statusCode: 400, code: 'MISSING_PROJECT_PATH' });
@@ -188,6 +192,10 @@ async function startSession(opts) {
   createOrchestrationSession({
     id, provider, projectPath, model, label,
     status: 'running', permissionMode, startedAt,
+    originSessionKey,
+    originChannel,
+    originAccountId,
+    originChatId,
   });
 
   // session.started not emitted to SSE — caller gets the response directly
@@ -220,7 +228,18 @@ async function startSession(opts) {
 
   // Webhook: override canUseTool
   if (permissionMode === 'webhook' && provider === 'claude') {
-    const webhookFn = buildWebhookCanUseTool(id, projectPath, provider, SERVER_BASE_URL);
+    const webhookFn = buildWebhookCanUseTool(
+      id,
+      projectPath,
+      provider,
+      SERVER_BASE_URL,
+      {
+        originSessionKey,
+        originChannel,
+        originAccountId,
+        originChatId,
+      },
+    );
     baseOptions._externalCanUseTool = async (toolName, input, context) => {
       const result = await webhookFn(toolName, input);
       return result; // { behavior: 'allow'|'deny', message?: string }
@@ -375,6 +394,12 @@ function getSessionDetail(id) {
     status: session.status,
     label: session.label,
     permissionMode: session.permission_mode,
+    origin: {
+      sessionKey: session.origin_session_key || null,
+      channel: session.origin_channel || null,
+      accountId: session.origin_account_id || null,
+      chatId: session.origin_chat_id || null,
+    },
     startedAt: session.started_at,
     lastActivityAt: session.last_activity_at,
     endedAt: session.ended_at,
@@ -415,6 +440,12 @@ function listSessions(filters) {
     provider: session.provider,
     status: session.status,
     label: session.label,
+    origin: {
+      sessionKey: session.origin_session_key || null,
+      channel: session.origin_channel || null,
+      accountId: session.origin_account_id || null,
+      chatId: session.origin_chat_id || null,
+    },
     startedAt: session.started_at,
     lastActivityAt: session.last_activity_at,
     contextUsage: {

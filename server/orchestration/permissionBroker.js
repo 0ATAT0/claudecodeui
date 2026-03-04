@@ -122,7 +122,7 @@ function resolveDecision(requestId, decision, source = 'linus', reason = '') {
  * @param {string} serverBaseUrl  e.g. 'https://localhost:3001'
  * @returns {function} canUseTool async function
  */
-function buildWebhookCanUseTool(sessionId, projectPath, provider, serverBaseUrl) {
+function buildWebhookCanUseTool(sessionId, projectPath, provider, serverBaseUrl, origin = {}) {
   return async function webhookCanUseTool(toolName, input) {
     const requestId = 'perm-' + crypto.randomBytes(8).toString('hex');
     const requestedAt = new Date().toISOString();
@@ -151,6 +151,10 @@ function buildWebhookCanUseTool(sessionId, projectPath, provider, serverBaseUrl)
       provider,
       callbackUrl,
       expiresAt,
+      originSessionKey: origin.originSessionKey || null,
+      originChannel: origin.originChannel || null,
+      originAccountId: origin.originAccountId || null,
+      originChatId: origin.originChatId || null,
     });
 
     const sig = hmacSign(payload);
